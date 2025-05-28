@@ -58,11 +58,30 @@ int execute_sandboxed(struct sandbox_config *config) {
     pid_t pid = fork();
 
     if (pid == 0) {
-        // Child process - execute the target program
+        // Child process - apply restrictions and execute the target program
         if (config->has_logfile) {
             log_message(config->logfile, "Starting sandboxed execution");
         }
 
+        printf("Applying Landlock restrictions in child process...\n");
+
+        // Apply Landlock filesystem restrictions
+        if (setup_landlock(config) != 0) {
+            fprintf(stderr, "Failed to setup Landlock restrictions in child\n");
+            exit(1);
+        }
+
+        printf("Applying seccomp restrictions in child process...\n");
+
+        // Apply seccomp syscall filtering
+        if (setup_seccomp() != 0) {
+            fprintf(stderr, "Failed to setup seccomp filtering in child\n");
+            exit(1);
+        }
+
+        printf("Executing: %s\n", config->executable);
+
+        // Execute the target program
         execvp(config->executable, config->exec_args);
         perror("execvp failed");
         exit(1);

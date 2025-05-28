@@ -13,23 +13,17 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    printf("Setting up sandbox...\n");
+    // Add essential system paths automatically
+    add_essential_system_paths(&config);
 
-    // Setup Landlock filesystem restrictions
-    if (setup_landlock(&config) != 0) {
-        fprintf(stderr, "Failed to setup Landlock restrictions\n");
-        return 1;
-    }
+    printf("Setting up sandbox for: %s\n", config.executable);
+    printf("Read paths: %d, Write paths: %d, Exec paths: %d\n",
+           config.read_count, config.write_count, config.exec_count);
 
-    // Setup seccomp syscall filtering
-    if (setup_seccomp() != 0) {
-        fprintf(stderr, "Failed to setup seccomp filtering\n");
-        return 1;
-    }
+    // DO NOT call setup_landlock() or setup_seccomp() here!
+    // They will be called in the child process only
 
-    printf("Executing sandboxed process: %s\n", config.executable);
-
-    // Execute the target program
+    // Execute the target program with restrictions applied in child
     return execute_sandboxed(&config);
 }
 

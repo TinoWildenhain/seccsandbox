@@ -41,5 +41,7 @@ int setup_seccomp(void);
 int execute_sandboxed(struct sandbox_config *config);
 void log_message(const char *logfile, const char *message);
 void print_usage(const char *program_name);
+void add_essential_system_paths(struct sandbox_config *config);
+
 
 #endif

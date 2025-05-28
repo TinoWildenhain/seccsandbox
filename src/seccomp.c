@@ -11,12 +11,13 @@ int setup_seccomp(void) {
 
         // Check architecture (x86_64)
         BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, AUDIT_ARCH_X86_64, 1, 0),
-        BPF_STMT(BPF_RET+BPF_K, SECCOMP_RET_KILL),
+        BPF_STMT(BPF_RET+BPF_K, SECCOMP_RET_KILL_PROCESS),
 
         // Load syscall number
         BPF_STMT(BPF_LD+BPF_W+BPF_ABS, offsetof(struct seccomp_data, nr)),
 
-        // Allow essential syscalls
+        // Essential syscalls for program execution
+        ALLOW_SYSCALL(execve),
         ALLOW_SYSCALL(read),
         ALLOW_SYSCALL(write),
         ALLOW_SYSCALL(open),
@@ -25,6 +26,7 @@ int setup_seccomp(void) {
         ALLOW_SYSCALL(stat),
         ALLOW_SYSCALL(fstat),
         ALLOW_SYSCALL(lstat),
+        ALLOW_SYSCALL(newfstatat),
         ALLOW_SYSCALL(lseek),
         ALLOW_SYSCALL(mmap),
         ALLOW_SYSCALL(mprotect),
@@ -35,25 +37,33 @@ int setup_seccomp(void) {
         ALLOW_SYSCALL(rt_sigreturn),
         ALLOW_SYSCALL(ioctl),
         ALLOW_SYSCALL(access),
+        ALLOW_SYSCALL(faccessat),
         ALLOW_SYSCALL(pipe),
+        ALLOW_SYSCALL(pipe2),
         ALLOW_SYSCALL(dup),
         ALLOW_SYSCALL(dup2),
+        ALLOW_SYSCALL(dup3),
         ALLOW_SYSCALL(getpid),
         ALLOW_SYSCALL(getuid),
         ALLOW_SYSCALL(getgid),
         ALLOW_SYSCALL(geteuid),
         ALLOW_SYSCALL(getegid),
+        ALLOW_SYSCALL(gettid),
+        ALLOW_SYSCALL(setfsuid),
+        ALLOW_SYSCALL(setfsgid),         // CRITICAL: Add this missing syscall
         ALLOW_SYSCALL(fcntl),
         ALLOW_SYSCALL(getcwd),
         ALLOW_SYSCALL(chdir),
         ALLOW_SYSCALL(readlink),
-        ALLOW_SYSCALL(execve),
+        ALLOW_SYSCALL(readlinkat),
         ALLOW_SYSCALL(exit),
         ALLOW_SYSCALL(exit_group),
         ALLOW_SYSCALL(wait4),
+        ALLOW_SYSCALL(waitid),
         ALLOW_SYSCALL(kill),
         ALLOW_SYSCALL(uname),
         ALLOW_SYSCALL(getrlimit),
+        ALLOW_SYSCALL(prlimit64),
         ALLOW_SYSCALL(getrusage),
         ALLOW_SYSCALL(times),
         ALLOW_SYSCALL(getpgrp),
@@ -61,36 +71,18 @@ int setup_seccomp(void) {
         ALLOW_SYSCALL(setsid),
         ALLOW_SYSCALL(setpgid),
         ALLOW_SYSCALL(clock_gettime),
+        ALLOW_SYSCALL(clock_getres),
         ALLOW_SYSCALL(arch_prctl),
         ALLOW_SYSCALL(futex),
         ALLOW_SYSCALL(set_tid_address),
         ALLOW_SYSCALL(set_robust_list),
-        ALLOW_SYSCALL(rseq),
         ALLOW_SYSCALL(madvise),
         ALLOW_SYSCALL(clone),
         ALLOW_SYSCALL(fork),
         ALLOW_SYSCALL(vfork),
         ALLOW_SYSCALL(sigaltstack),
         ALLOW_SYSCALL(getrandom),
-
-        // Default: kill process
-        BPF_STMT(BPF_RET+BPF_K, SECCOMP_RET_KILL),
-    };
-
-    struct sock_fprog prog = {
-        .len = (unsigned short)(sizeof(filter)/sizeof(filter[0])),
-        .filter = filter,
-    };
-
-    if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) != 0) {
-        perror("prctl(PR_SET_NO_NEW_PRIVS)");
-        return -1;
-    }
-
-    if (prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, &prog) != 0) {
-        perror("prctl(PR_SET_SECCOMP)");
-        return -1;
-    }
-
-    return 0;
-}
+        ALLOW_SYSCALL(prctl),
+        ALLOW_SYSCALL(pread64),
+        ALLOW_SYSCALL(pwrite64),
+        ALLOW_SYSCALL(rseq),
