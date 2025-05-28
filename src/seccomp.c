@@ -51,10 +51,16 @@ int setup_seccomp(struct sandbox_config *config) {
         ALLOW_SYSCALL(fstat),            // Get file status by fd
         ALLOW_SYSCALL(lstat),            // Get file status, don't follow symlinks
         ALLOW_SYSCALL(newfstatat),       // Get file status relative to directory fd
+        ALLOW_SYSCALL(statx),            // Get extended file status (modern)
         ALLOW_SYSCALL(statfs),           // Get filesystem statistics
         ALLOW_SYSCALL(fstatfs),          // Get filesystem statistics by fd
         ALLOW_SYSCALL(access),           // Check file permissions (legacy)
         ALLOW_SYSCALL(faccessat),        // Check file permissions relative to directory fd
+
+        // Advanced I/O and file optimization
+        ALLOW_SYSCALL(pread64),          // Read from file at offset
+        ALLOW_SYSCALL(pwrite64),         // Write to file at offset
+        ALLOW_SYSCALL(fadvise64),        // File access pattern advice
 
         // File positioning and control
         ALLOW_SYSCALL(lseek),            // Change file position
