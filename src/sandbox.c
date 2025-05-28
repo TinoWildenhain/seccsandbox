@@ -3,6 +3,9 @@
 int parse_arguments(int argc, char *argv[], struct sandbox_config *config) {
     int i;
 
+    // Set default seccomp mode
+    config->seccomp_mode = SECCOMP_MODE_KILL;
+
     for (i = 1; i < argc; i++) {
         if (strncmp(argv[i], "--read=", 7) == 0) {
             if (config->read_count >= MAX_PATHS) {
@@ -32,6 +35,19 @@ int parse_arguments(int argc, char *argv[], struct sandbox_config *config) {
             strncpy(config->logfile, argv[i] + 10, MAX_PATH_LEN - 1);
             config->has_logfile = 1;
         }
+        else if (strncmp(argv[i], "--seccomp-block=", 16) == 0) {
+            const char *mode = argv[i] + 16;
+            if (strcmp(mode, "kill") == 0) {
+                config->seccomp_mode = SECCOMP_MODE_KILL;
+            } else if (strcmp(mode, "log") == 0) {
+                config->seccomp_mode = SECCOMP_MODE_LOG;
+            } else if (strcmp(mode, "errno") == 0) {
+                config->seccomp_mode = SECCOMP_MODE_ERRNO;
+            } else {
+                fprintf(stderr, "Invalid seccomp block mode: %s (use: kill, log, errno)\n", mode);
+                return -1;
+            }
+        }
         else if (argv[i][0] != '-') {
             // This is the executable
             strncpy(config->executable, argv[i], MAX_PATH_LEN - 1);
@@ -55,31 +71,35 @@ int parse_arguments(int argc, char *argv[], struct sandbox_config *config) {
 }
 
 int execute_sandboxed(struct sandbox_config *config) {
+    printf("Forking to create sandboxed process...\n");
+
     pid_t pid = fork();
 
     if (pid == 0) {
         // Child process - apply restrictions and execute the target program
+        printf("Child process started, applying restrictions...\n");
+
         if (config->has_logfile) {
             log_message(config->logfile, "Starting sandboxed execution");
         }
 
-        printf("Applying Landlock restrictions in child process...\n");
-
-        // Apply Landlock filesystem restrictions
+        // Apply Landlock filesystem restrictions FIRST
+        printf("Setting up Landlock filesystem restrictions...\n");
         if (setup_landlock(config) != 0) {
-            fprintf(stderr, "Failed to setup Landlock restrictions in child\n");
+            fprintf(stderr, "Failed to setup Landlock restrictions\n");
             exit(1);
         }
 
-        printf("Applying seccomp restrictions in child process...\n");
-
-        // Apply seccomp syscall filtering
-        if (setup_seccomp() != 0) {
-            fprintf(stderr, "Failed to setup seccomp filtering in child\n");
+        // Apply seccomp syscall filtering SECOND
+        printf("Setting up seccomp syscall filtering (mode: %s)...\n",
+               config->seccomp_mode == SECCOMP_MODE_KILL ? "kill" :
+               config->seccomp_mode == SECCOMP_MODE_LOG ? "log" : "errno");
+        if (setup_seccomp(config) != 0) {
+            fprintf(stderr, "Failed to setup seccomp filtering\n");
             exit(1);
         }
 
-        printf("Executing: %s\n", config->executable);
+        printf("Restrictions applied, executing: %s\n", config->executable);
 
         // Execute the target program
         execvp(config->executable, config->exec_args);
@@ -88,14 +108,23 @@ int execute_sandboxed(struct sandbox_config *config) {
     }
     else if (pid > 0) {
         // Parent process - wait for child
+        printf("Parent waiting for child process %d...\n", pid);
         int status;
         waitpid(pid, &status, 0);
 
-        if (config->has_logfile) {
-            char msg[256];
-            snprintf(msg, sizeof(msg), "Sandboxed process exited with status %d",
-                    WEXITSTATUS(status));
-            log_message(config->logfile, msg);
+        if (WIFSIGNALED(status)) {
+            int sig = WTERMSIG(status);
+            printf("Child process killed by signal %d", sig);
+
+            if (sig == SIGSYS) {
+                printf(" (SIGSYS - seccomp violation)");
+                if (config->has_logfile) {
+                    log_message(config->logfile, "Process killed by seccomp - syscall violation detected");
+                }
+            }
+            printf("\n");
+        } else if (WIFEXITED(status)) {
+            printf("Child process exited normally with status %d\n", WEXITSTATUS(status));
         }
 
         return WEXITSTATUS(status);

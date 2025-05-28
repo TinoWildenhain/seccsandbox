@@ -1,5 +1,5 @@
 #include "sandbox.h"
-#include <time.h>
+#include <time.h>  // Add missing header
 
 void log_message(const char *logfile, const char *message) {
     FILE *fp = fopen(logfile, "a");
