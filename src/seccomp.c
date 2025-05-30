@@ -179,6 +179,7 @@ int setup_seccomp(struct sandbox_config *config) {
         ALLOW_SYSCALL(ftruncate),        // Truncate file by fd
         ALLOW_SYSCALL(fsync),            // Synchronize file data
         ALLOW_SYSCALL(fdatasync),        // Synchronize file data (no metadata)
+        ALLOW_SYSCALL(unlink),           // Remove/delete files
 
         // Memory management and NUMA policy
         ALLOW_SYSCALL(mmap),             // Map memory
