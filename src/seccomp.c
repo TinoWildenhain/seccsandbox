@@ -180,6 +180,9 @@ int setup_seccomp(struct sandbox_config *config) {
         ALLOW_SYSCALL(fsync),            // Synchronize file data
         ALLOW_SYSCALL(fdatasync),        // Synchronize file data (no metadata)
         ALLOW_SYSCALL(unlink),           // Remove/delete files
+        ALLOW_SYSCALL(rename),           // Rename/move files (legacy)
+        ALLOW_SYSCALL(renameat),         // Rename relative to directory fd
+        ALLOW_SYSCALL(renameat2),        // Rename with additional flags
 
         // Memory management and NUMA policy
         ALLOW_SYSCALL(mmap),             // Map memory
